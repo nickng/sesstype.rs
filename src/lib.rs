@@ -26,10 +26,14 @@
 //! (http://mrg.doc.ic.ac.uk/publications/a-linear-decomposition-of-multiparty-sessions-for-safe-distributed-programming/)
 //! by Scalas et al.
 
+mod projection;
+
 use std::cmp::Eq;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::string::ToString;
+
+pub use projection::project;
 
 /// Payload Type carried by a `Message`.
 ///
