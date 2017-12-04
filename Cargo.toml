@@ -1,6 +1,6 @@
 [package]
 name = "sesstype"
 version = "0.1.0"
-authors = ["Nicholas Ng <nickng@nickng.io>"]
+authors = ["The libsesstype Contributors"]
 
 [dependencies]
