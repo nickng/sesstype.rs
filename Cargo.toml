@@ -2,5 +2,13 @@
 name = "sesstype"
 version = "0.1.0"
 authors = ["The libsesstype Contributors"]
+description = "An implementation of Multiparty Session Types"
+repository = "https://github.com/nickng/sesstype.rs"
+readme = "README.md"
+keywords = ["session", "types"]
+categories = ["data-structures", "development-tools"]
+license-file = "LICENSE"
 
 [dependencies]
+
+[badges]
