@@ -1,5 +1,9 @@
 # sesstype
 
+[![Build Status](https://travis-ci.org/nickng/sesstype.rs.svg?branch=master)](https://travis-ci.org/nickng/sesstype.rs)
+[![Crates.io Version](https://img.shields.io/crates/v/sesstype.svg)](https://crates.io/crates/sesstype)
+
+
 This is an implementation of Multiparty Session Types in Rust.
 The `sesstype` crate contains core data structures and utility functions
 to model and manipulate a multiparty session type language.
@@ -110,15 +114,23 @@ This program parses an input string, then re-parses the output global type:
 extern crate sesstype;
 
 let input = String::from("*T . A -> B: { l().T, l2(int).end }");
-let global = sesstype::parser::parse_global_type(input.clone());
-let parsed = global.unwrap().to_string();
-let reparsed = sesstype::parser::parse_global_type(parsed.clone());
+let (global, _registry) = sesstype::parser::parse_global_type(input.clone()).unwrap();
+let parsed = global.to_string();
+let (reparsed, registry) = sesstype::parser::parse_global_type(parsed.clone()).unwrap();
 print!(
     "Input:\n\t{}\nParsed:\n\t{}\nRe-parsed:\n\t{}\n",
     input,
     parsed,
-    reparsed.unwrap().to_string()
-)
+    reparsed.to_string()
+);
+
+// Project for A
+let role_a = registry.find_role_str("A").unwrap();
+let local = sesstype::project(&reparsed, &role_a).unwrap();
+print!(
+    "Projected (for A):\n\t{}\n",
+    local.to_string()
+);
 ```
 
 This is one of the expected output (because branches order in interactions are non-deterministic):
@@ -130,6 +142,8 @@ Parsed:
 	μT.A → B:{ l().T, l2(int).end }
 Re-parsed:
 	μT.A → B:{ l().T, l2(int).end }
+Projected (for A):
+	μT.A⊕{ !l().T, !l2(int).end }
 ```
 
 ## License
