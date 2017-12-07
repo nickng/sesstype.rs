@@ -162,12 +162,12 @@ named!(payload<PayloadType>,
 //          | typevar
 //          | end
 named_args!(global<'a>(r: &'a mut RoleRegistry)<Box<global::Type>>,
-       alt!(
+       ws!(alt_complete!(
            call!(interaction, r) |
            call!(end)            |
            call!(recur, r)       |
            call!(typevar)
-       )
+       ))
 );
 
 // interact = sendrecv | '{' sendrecv (',' sendrecv)+ '}'
@@ -236,13 +236,13 @@ named!(end<Box<global::Type>>,
 //          | ltypevar
 //          | end
 named_args!(local<'a>(r: &'a mut RoleRegistry)<Box<local::Type>>,
-       alt!(
+       ws!(alt_complete!(
            call!(branch, r) |
            call!(select, r) |
            call!(lend)      |
            call!(lrecur, r) |
            call!(ltypevar)
-       )
+       ))
 );
 
 // branch   = recv | '{' recv (',' recv)+ '}'
