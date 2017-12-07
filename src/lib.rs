@@ -820,13 +820,5 @@ mod tests {
             }
             _ => assert!(false),
         }
-        /*
-        assert_eq!(
-            p.to_string(),
-            String::from(
-                "μT.bob?label(int).alice⊕{ !label2(int).T, !label3().end }",
-            )
-        );
-        */
     }
 }
