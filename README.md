@@ -57,6 +57,80 @@ Global type G: Alice → Bob:lab().end
 Local Type G@Bob: Bob?lab().end
 ```
 
+### Parsing
+
+Alternative way of using the library is through a simple type language with the
+grammar:
+
+#### Common
+
+```
+ident   = [A-Za-z][A-Za-z0-9]*
+role    = ident
+message = ident payload
+payload = "()"
+        | "(" ident ")"
+```
+
+#### Global Types
+
+```
+global   = "(" role "->" role ":" interact ")"
+         | recur
+         | typevar
+         | end
+interact = sendrecv | "{" sendrecv ("," sendrecv)+ "}"
+sendrecv = message "." global
+recur    = "*" ident "." global
+typevar  = ident
+end      = "end"
+```
+
+#### Local Types
+
+```
+local    = role "&" branch
+         | role "+" select
+         | lrecur
+         | ltypevar
+         | end
+branch   = recv | "{" recv ("," recv)+ "}"
+recv     = "?" message "." local
+select   = send | "{" send ("," send)+ "}"
+send     = "!" message "." local
+lrecur   = "*" ident "." local
+ltypevar = ident
+lend     = "end"
+```
+
+### Parsing example:
+
+This program parses an input string, then re-parses the output global type:
+```
+extern crate sesstype;
+
+let input = String::from("*T . A -> B: { l().T, l2(int).end }");
+let global = sesstype::parser::parse_global_type(input.clone());
+let parsed = global.unwrap().to_string();
+let reparsed = sesstype::parser::parse_global_type(parsed.clone());
+print!(
+    "Input:\n\t{}\nParsed:\n\t{}\nRe-parsed:\n\t{}\n",
+    input,
+    parsed,
+    reparsed.unwrap().to_string()
+)
+```
+
+This is one of the expected output (because branches order in interactions are non-deterministic):
+
+```
+Input:
+	*T . A -> B: { l().T, l2(int).end }
+Parsed:
+	μT.A → B:{ l().T, l2(int).end }
+Re-parsed:
+	μT.A → B:{ l().T, l2(int).end }
+```
 
 ## License
 

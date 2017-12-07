@@ -10,5 +10,6 @@ categories = ["data-structures", "development-tools"]
 license-file = "LICENSE"
 
 [dependencies]
+nom = "^3.2"
 
 [badges]

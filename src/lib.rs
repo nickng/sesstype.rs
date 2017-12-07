@@ -26,6 +26,60 @@
 //! (http://mrg.doc.ic.ac.uk/publications/a-linear-decomposition-of-multiparty-sessions-for-safe-distributed-programming/)
 //! by Scalas et al.
 
+#[macro_use]
+extern crate nom;
+
+/// The module provides parser for a simple session type language.
+///
+/// # Grammar
+///
+/// Two parser functions are provided for *Global Type* and *Local Type*
+/// respectively, as with the parent `sesstype` module, both types share
+/// common elements `role` and `message`, and the grammars are shown below:
+///
+/// ## Common
+///
+/// ```ignore
+/// ident   = [A-Za-z][A-Za-z0-9]*
+/// role    = ident
+/// message = ident payload
+/// payload = "()"
+///         | "(" ident ")"
+/// ```
+///
+/// ## Global Types
+///
+/// ```ignore
+/// global   = "(" role "->" role ":" interact ")"
+///          | recur
+///          | typevar
+///          | end
+/// interact = sendrecv | "{" sendrecv ("," sendrecv)+ "}"
+/// sendrecv = message "." global
+/// recur    = "*" ident "." global
+/// typevar  = ident
+/// end      = "end"
+/// ```
+///
+/// ## Local Types
+///
+/// ```ignore
+/// local    = role "&" branch
+///          | role "+" select
+///          | lrecur
+///          | ltypevar
+///          | end
+/// branch   = recv | "{" recv ("," recv)+ "}"
+/// recv     = "?" message "." local
+/// select   = send | "{" send ("," send)+ "}"
+/// send     = "!" message "." local
+/// lrecur   = "*" ident "." local
+/// ltypevar = ident
+/// lend     = "end"
+/// ```
+///
+pub mod parser;
+
 mod projection;
 
 use std::cmp::Eq;
