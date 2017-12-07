@@ -7,7 +7,7 @@ repository = "https://github.com/nickng/sesstype.rs"
 readme = "README.md"
 keywords = ["session", "types"]
 categories = ["data-structures", "development-tools"]
-license-file = "LICENSE"
+license = "Apache-2.0"
 
 [dependencies]
 nom = "^3.2"
