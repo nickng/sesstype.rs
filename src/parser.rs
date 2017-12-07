@@ -291,3 +291,29 @@ named!(ltypevar<Box<local::Type>>,
 named!(lend<Box<local::Type>>,
        map!(tag!("end"), |_| local::Type::end())
 );
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_global_type, parse_local_type};
+    use super::super::{Role, project};
+
+    #[test]
+    fn test_parse_global() {
+        let g = parse_global_type(String::from("* T .A->B:{ l(int).T}"));
+        assert_eq!(g.unwrap().to_string(), "μT.A → B:l(int).T");
+    }
+
+    #[test]
+    fn test_parse_local() {
+        let l = parse_local_type(String::from("*T .A&{?l(int).T}"));
+        assert_eq!(l.unwrap().to_string(), "μT.A?l(int).T");
+    }
+
+    #[test]
+    fn test_parse_project() {
+        let g = parse_global_type(String::from("* T .A->B:{ l(int).T}"));
+        let global_type = g.unwrap();
+        let l = project(&global_type, &Role::new("A"));
+        assert_eq!(l.unwrap().to_string(), "μT.A?l(int).T");
+    }
+}
