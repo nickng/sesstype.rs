@@ -79,7 +79,7 @@ payload = "()"
 #### Global Types
 
 ```
-global   = "(" role "->" role ":" interact ")"
+global   = role "->" role ":" interact
          | recur
          | typevar
          | end
