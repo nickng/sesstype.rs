@@ -378,6 +378,6 @@ mod tests {
         let g = parse_global_type(String::from("* T .A->B:{ l(int).B->A:{ l2().T } }"));
         let (global_type, registry) = g.unwrap();
         let l = project(&global_type, &registry.find_role_str("A").unwrap());
-        assert_eq!(l.unwrap().to_string(), "μT.A!l(int).A?l2().T");
+        assert_eq!(l.unwrap().to_string(), "μT.B!l(int).B?l2().T");
     }
 }

@@ -29,7 +29,7 @@ pub fn project(global_type: &Box<G>, role: &Rc<Role>) -> Option<Box<S>> {
             ref g,
         } => {
             if Rc::ptr_eq(&role, &p) {
-                let mut sel = S::select(role);
+                let mut sel = S::select(q);
                 for (m_i, g_i) in g {
                     let projected_s = project(&g_i, role);
                     match projected_s {
@@ -42,7 +42,7 @@ pub fn project(global_type: &Box<G>, role: &Rc<Role>) -> Option<Box<S>> {
                 }
                 Some(sel)
             } else if Rc::ptr_eq(&role, &q) {
-                let mut br = S::branch(role);
+                let mut br = S::branch(p);
                 for (m_i, g_i) in g {
                     let projected_s = project(&g_i, role);
                     match projected_s {
@@ -224,7 +224,7 @@ mod tests {
                         assert_eq!(t, "T");
                         match **s {
                             local::Type::Select { ref p, ref s } => {
-                                assert!(Rc::ptr_eq(p, &sndr));
+                                assert!(Rc::ptr_eq(p, &rcvr));
                                 for (m_i, s_i) in s {
                                     match m_i.label().as_str() {
                                         "label1" => {
@@ -261,7 +261,7 @@ mod tests {
                         assert_eq!(t, "T");
                         match **s {
                             local::Type::Branch { ref p, ref s } => {
-                                assert!(Rc::ptr_eq(p, &rcvr));
+                                assert!(Rc::ptr_eq(p, &sndr));
                                 for (m_i, s_i) in s {
                                     match m_i.label().as_str() {
                                         "label1" => {
