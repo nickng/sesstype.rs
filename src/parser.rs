@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use nom::{IResult, is_alphanumeric};
+use nom::{IResult, is_alphanumeric, is_alphabetic};
 use std::rc::Rc;
 use std::collections::HashMap;
 use super::{global, local, Message, PayloadType, Role};
@@ -136,9 +136,14 @@ pub fn parse_local_type(s: String) -> Option<(Box<local::Type>, RoleRegistry)> {
 // For reference, the grammar of each non-terminal symbol are shown inline.
 //
 
-// ident   = [A-Za-z][A-Za-z0-9]* // TODO: current definition is [A-Za-z0-9]*
+// ident   = [A-Za-z][A-Za-z0-9]*
 named!(ident<String>,
-       map!(take_while!(is_alphanumeric),slice_to_string));
+       do_parse!(
+           prefix: take_while!(is_alphabetic) >>
+           suffix: take_while!(is_alphanumeric) >>
+          (slice_to_string(prefix) + &slice_to_string(suffix))
+       )
+);
 
 // role    = ident
 named_args!(role<'a>(r: &'a mut RoleRegistry)<Rc<Role>>,
