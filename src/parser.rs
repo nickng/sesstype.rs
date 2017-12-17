@@ -14,7 +14,7 @@
 
 use nom::{IResult, is_alphanumeric, is_alphabetic};
 use std::rc::Rc;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use super::{global, local, Message, PayloadType, Role};
 
 // Helper functions
@@ -84,13 +84,49 @@ impl RoleRegistry {
     }
 }
 
+/// Valid TypeVars defined in the protocol.
+///
+/// A type variable T can only appear in the body of a recur{ t: "T", body }.
+///
+struct TypeVars {
+    typevars: HashSet<String>,
+}
+
+impl TypeVars {
+    /// Creats a new empty TypeVar registry.
+    ///
+    fn new() -> TypeVars {
+        TypeVars { typevars: HashSet::new() }
+    }
+
+    /// Adds a typevar to the scope.
+    ///
+    /// An ident that matches a typevar is parsed as a valid typevar.
+    ///
+    fn add(&mut self, typevar: String) -> String {
+        self.typevars.insert(typevar.clone());
+        typevar
+    }
+
+    /// Checks if a potential typevar is in scope.
+    ///
+    /// If the typevar is in scope, the typevar would be converted to
+    /// a Type::TypeVar, otherwise it may be considered a Role or other
+    /// possible ambiguous ident.
+    ///
+    fn is_valid(&self, typevar: &String) -> bool {
+        self.typevars.contains(typevar)
+    }
+}
+
 // Public parse functions.
 
 /// Returns parsed `global::Type` from a given `String`.
 ///
 pub fn parse_global_type(s: String) -> Option<(Box<global::Type>, RoleRegistry)> {
     let mut registry = RoleRegistry::new();
-    let g = global(s.as_bytes(), &mut registry);
+    let mut typevars = TypeVars::new();
+    let g = global(s.as_bytes(), &mut registry, &mut typevars);
     match g {
         IResult::Done(unparsed, global_type) => {
             if unparsed.len() > 0 {
@@ -113,7 +149,8 @@ pub fn parse_global_type(s: String) -> Option<(Box<global::Type>, RoleRegistry)>
 ///
 pub fn parse_local_type(s: String) -> Option<(Box<local::Type>, RoleRegistry)> {
     let mut registry = RoleRegistry::new();
-    let l = local(s.as_bytes(), &mut registry);
+    let mut typevars = TypeVars::new();
+    let l = local(s.as_bytes(), &mut registry, &mut typevars);
     match l {
         IResult::Done(unparsed, local_type) => {
             if unparsed.len() > 0 {
@@ -180,25 +217,25 @@ named!(payload<PayloadType>,
 //          | recur
 //          | typevar
 //          | end
-named_args!(global<'a>(r: &'a mut RoleRegistry)<Box<global::Type>>,
+named_args!(global<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<global::Type>>,
        ws!(alt_complete!(
-           call!(interaction, r) |
-           call!(end)            |
-           call!(recur, r)       |
-           call!(typevar)
+           call!(interaction, r, tv) |
+           call!(end)                | // Check end before typevar
+           call!(recur, r, tv)       |
+           call!(typevar, tv)
        ))
 );
 
 // interact = sendrecv | '{' sendrecv (',' sendrecv)+ '}'
-named_args!(interaction<'a>(r: &'a mut RoleRegistry)<Box<global::Type>>,
+named_args!(interaction<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<global::Type>>,
        ws!(do_parse!(
                sndr: call!(role, r) >>
                alt!( tag!("->") | tag!("→") ) >>
                rcvr: call!(role, r) >>
                tag!(":") >>
                g: alt!(
-                    call!(sendrecv, r)  => {|t: _| singleton_vec(t)} |
-                    call!(sendrecvs, r) => {|v: _| v}) >>
+                    call!(sendrecv, r, tv)  => {|t: _| singleton_vec(t)} |
+                    call!(sendrecvs, r, tv) => {|v: _| v}) >>
                ({
                    let mut stmt = global::Type::interaction(&sndr, &rcvr);
                    for mg_i in g.into_iter() {
@@ -210,38 +247,43 @@ named_args!(interaction<'a>(r: &'a mut RoleRegistry)<Box<global::Type>>,
 );
 
 // sendrecv = message '.' global
-named_args!(sendrecv<'a>(r: &'a mut RoleRegistry)<(Message, Box<global::Type>)>,
+named_args!(sendrecv<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message, Box<global::Type>)>,
        ws!(do_parse!(
                m: call!(message) >>
                tag!(".") >>
-               g: call!(global, r) >>
+               g: call!(global, r, tv) >>
                ((m, g))
        ))
 );
 
-named_args!(sendrecvs<'a>(r: &'a mut RoleRegistry)<Vec<(Message, Box<global::Type>)>>,
+named_args!(sendrecvs<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<global::Type>)>>,
        ws!(do_parse!(
                tag!("{") >>
-               l: separated_list!(tag!(","), call!(sendrecv, r)) >>
+               e: separated_list!(tag!(","), call!(sendrecv, r, tv)) >>
                tag!("}") >>
-               (l)
+               (e)
        ))
 );
 
 // recur    = '*' ident '.' global
-named_args!(recur<'a>(r: &'a mut RoleRegistry)<Box<global::Type>>,
+named_args!(recur<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<global::Type>>,
        ws!(do_parse!(
                alt!( tag!("μ") | tag!("*") ) >>
                t: call!(ident) >>
+               v: expr_res!({ let res: Result<String, u8> = Ok(tv.add(t)); res }) >>
                tag!(".") >>
-               g: call!(global, r) >>
-               (global::Type::recur(&*t, g))
+               g: call!(global, r, tv) >>
+               (global::Type::recur(&v, g))
        ))
 );
 
 // typevar  = ident
-named!(typevar<Box<global::Type>>,
-    map!(call!(ident), |t: String| global::Type::typevar(&*t))
+named_args!(typevar<'a>(tv: &'a mut TypeVars)<Box<global::Type>>,
+    do_parse!(
+        s: call!(ident) >>
+        e: expr_opt!({ if tv.is_valid(&s) { Some(global::Type::typevar(&s)) } else { None } }) >>
+        (e)
+    )
 );
 
 // end      = 'end'
@@ -254,24 +296,24 @@ named!(end<Box<global::Type>>,
 //          | lrecur
 //          | ltypevar
 //          | end
-named_args!(local<'a>(r: &'a mut RoleRegistry)<Box<local::Type>>,
+named_args!(local<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<local::Type>>,
        ws!(alt_complete!(
-           call!(branch, r) |
-           call!(select, r) |
-           call!(lend)      |
-           call!(lrecur, r) |
-           call!(ltypevar)
+           call!(branch, r, tv) |
+           call!(select, r, tv) |
+           call!(lend)          |
+           call!(lrecur, r, tv) |
+           call!(ltypevar, tv)
        ))
 );
 
 // branch   = recv | '{' recv (',' recv)+ '}'
-named_args!(branch<'a>(r: &'a mut RoleRegistry)<Box<local::Type>>,
+named_args!(branch<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<local::Type>>,
        ws!(do_parse!(
                p: call!(role, r) >>
                tag!("&") >>
                s: alt!(
-                   call!(recv, r)  => {|t: _| singleton_vec(t)} |
-                   call!(recvs, r) => {|v: _| v}) >>
+                   call!(recv, r, tv)  => {|t: _| singleton_vec(t)} |
+                   call!(recvs, r, tv) => {|v: _| v}) >>
                ({
                    let mut stmt = local::Type::branch(&p);
                    for ms_i in s.into_iter() {
@@ -283,33 +325,33 @@ named_args!(branch<'a>(r: &'a mut RoleRegistry)<Box<local::Type>>,
 );
 
 // recv     = '?' message '.' local
-named_args!(recv<'a>(r: &'a mut RoleRegistry)<(Message, Box<local::Type>)>,
+named_args!(recv<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message, Box<local::Type>)>,
        ws!(do_parse!(
                tag!("?") >>
                m: call!(message) >>
                tag!(".") >>
-               s: call!(local, r) >>
+               s: call!(local, r, tv) >>
                ((m, s))
        ))
 );
 
-named_args!(recvs<'a>(r: &'a mut RoleRegistry)<Vec<(Message, Box<local::Type>)>>,
+named_args!(recvs<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<local::Type>)>>,
        ws!(do_parse!(
                tag!("{") >>
-               l: separated_list!(tag!(","), call!(recv, r)) >>
+               e: separated_list!(tag!(","), call!(recv, r, tv)) >>
                tag!("}") >>
-               (l)
+               (e)
        ))
 );
 
 // select   = send | '{' send (',' send)+ '}'
-named_args!(select<'a>(r: &'a mut RoleRegistry)<Box<local::Type>>,
+named_args!(select<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<local::Type>>,
        ws!(do_parse!(
                p: call!(role, r) >>
                alt!( tag!("+") | tag!("⊕") ) >>
                s: alt!(
-                   call!(send, r)  => {|t: _| singleton_vec(t)} |
-                   call!(sends, r) => {|v: _| v}) >>
+                   call!(send, r, tv)  => {|t: _| singleton_vec(t)} |
+                   call!(sends, r, tv) => {|v: _| v}) >>
                ({
                    let mut stmt = local::Type::select(&p);
                    for ms_i in s.into_iter() {
@@ -321,39 +363,44 @@ named_args!(select<'a>(r: &'a mut RoleRegistry)<Box<local::Type>>,
 );
 
 // send     = '!' message '.' local
-named_args!(send<'a>(r: &'a mut RoleRegistry)<(Message, Box<local::Type>)>,
+named_args!(send<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message, Box<local::Type>)>,
        ws!(do_parse!(
                tag!("!") >>
                m: call!(message) >>
                tag!(".") >>
-               s: call!(local, r) >>
+               s: call!(local, r, tv) >>
                ((m, s))
        ))
 );
 
-named_args!(sends<'a>(r: &'a mut RoleRegistry)<Vec<(Message, Box<local::Type>)>>,
+named_args!(sends<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<local::Type>)>>,
        ws!(do_parse!(
                tag!("{") >>
-               l: separated_list!(tag!(","), call!(send, r)) >>
+               e: separated_list!(tag!(","), call!(send, r, tv)) >>
                tag!("}") >>
-               (l)
+               (e)
        ))
 );
 
 // lrecur   = '*' ident '.' local
-named_args!(lrecur<'a>(r: &'a mut RoleRegistry)<Box<local::Type>>,
+named_args!(lrecur<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<local::Type>>,
        ws!(do_parse!(
                alt!( tag!("μ") | tag!("*") ) >>
                t: call!(ident) >>
+               v: expr_res!({ let res: Result<String, u8> = Ok(tv.add(t)); res }) >>
                tag!(".") >>
-               s: call!(local, r) >>
-               (local::Type::recur(&*t, s))
+               s: call!(local, r, tv) >>
+               (local::Type::recur(&v, s))
        ))
 );
 
 // ltypevar = ident
-named!(ltypevar<Box<local::Type>>,
-    map!(call!(ident), |t: String| local::Type::typevar(&*t))
+named_args!(ltypevar<'a>(tv: &'a mut TypeVars)<Box<local::Type>>,
+    do_parse!(
+        s: call!(ident) >>
+        e: expr_opt!({ if tv.is_valid(&s) { Some(local::Type::typevar(&s)) } else { None } }) >>
+        (e)
+    )
 );
 
 // lend     = "end"
@@ -364,7 +411,7 @@ named!(lend<Box<local::Type>>,
 #[cfg(test)]
 mod tests {
     use super::{parse_global_type, parse_local_type};
-    use super::super::project;
+    use super::super::{global, project};
 
     #[test]
     fn test_parse_global() {
@@ -384,5 +431,91 @@ mod tests {
         let (global_type, registry) = g.unwrap();
         let l = project(&global_type, &registry.find_role_str("A").unwrap());
         assert_eq!(l.unwrap().to_string(), "μT.B!l(int).B?l2().T");
+    }
+
+    #[test]
+    fn test_parse_ambiguous() {
+        let g = parse_global_type(String::from("*T.A"));
+        match g {
+            Some(_) => assert!(false), // Not expecting this to parse
+            None => (),
+        }
+    }
+
+    #[test]
+    fn test_parse_ambiguous2() {
+        let g = parse_global_type(String::from("*T.end"));
+        match g {
+            Some(parsed) => {
+                let (t, _reg) = parsed;
+                match *t {
+                    global::Type::Recur { ref t, ref g } => {
+                        assert_eq!(*t, String::from("T"));
+                        match **g {
+                            global::Type::End => (),
+                            _ => assert!(false),
+                        }
+                    }
+                    _ => assert!(false),
+                }
+            }
+            None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_parse_ambiguous3() {
+        let g = parse_global_type(String::from("*T.T"));
+        match g {
+            Some(parsed) => {
+                let (t, _reg) = parsed;
+                match *t {
+                    global::Type::Recur { ref t, ref g } => {
+                        assert_eq!(*t, String::from("T"));
+                        match **g {
+                            global::Type::TypeVar { ref t } => assert_eq!(*t, String::from("T")),
+                            _ => assert!(false),
+                        }
+                    }
+                    _ => assert!(false),
+                }
+            }
+            None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_parse_ambiguous4() {
+        let g = parse_global_type(String::from("*T.A->B: { l().end }"));
+        match g {
+            Some(parsed) => {
+                let (t, reg) = parsed;
+                match *t {
+                    global::Type::Recur { ref t, ref g } => {
+                        assert_eq!(*t, String::from("T"));
+                        match **g {
+                            global::Type::Interact {
+                                ref p,
+                                ref q,
+                                ref g,
+                            } => {
+                                assert_eq!(reg.find_role_str("A").unwrap().name(), p.name());
+                                assert_eq!(reg.find_role_str("B").unwrap().name(), q.name());
+                                for (m, g) in g {
+                                    assert_eq!(*m.label(), String::from("l"));
+                                    match **g {
+                                        global::Type::End => (),
+                                        _ => assert!(false),
+                                    }
+                                }
+                            }
+                            _ => assert!(false),
+                        }
+                    }
+                    _ => assert!(false),
+                }
+            }
+            None => assert!(false),
+        }
     }
 }
