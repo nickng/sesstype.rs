@@ -1,6 +1,6 @@
 [package]
 name = "sesstype"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["The libsesstype Contributors"]
 description = "An implementation of Multiparty Session Types"
 repository = "https://github.com/nickng/sesstype.rs"
