@@ -40,7 +40,7 @@ pub fn project(global_type: &Box<G>, role: &Rc<Role>) -> Option<Box<S>> {
                         None => (),
                     }
                 }
-                Some(sel)
+                if sel.len() > 0 { Some(sel) } else { None }
             } else if Rc::ptr_eq(&role, &q) {
                 let mut br = S::branch(p);
                 for (m_i, g_i) in g {
@@ -53,7 +53,7 @@ pub fn project(global_type: &Box<G>, role: &Rc<Role>) -> Option<Box<S>> {
                         None => (),
                     }
                 }
-                Some(br)
+                if br.len() > 0 { Some(br) } else { None }
             } else {
                 // p != role != q
                 match g.len() {
@@ -86,7 +86,10 @@ pub fn project(global_type: &Box<G>, role: &Rc<Role>) -> Option<Box<S>> {
                                         None => (),
                                     }
                                 }
-                                merged
+                                match merged {
+                                    Some(s) => if s.len() > 0 { Some(s) } else { None }
+                                    None => None,
+                                }
                             }
                             None => None,
                         }
@@ -289,6 +292,34 @@ mod tests {
                 }
             }
             None => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_project_mergefail() {
+        let p = Role::new("P");
+        let q = Role::new("Q");
+        let r = Role::new("R");
+        let a = Message::new("a");
+        let b = Message::new("b");
+        let a2_1 = Message::new("a2");
+        let a2_2 = Message::new("a2");
+        let a3 = Message::new("a3");
+
+        let p3_1 =
+            global::Type::add_message(global::Type::interaction(&r, &p), a3, global::Type::end());
+        let p2_1 = global::Type::add_message(global::Type::interaction(&q, &r), a2_1, p3_1);
+        let p2_2 =
+            global::Type::add_message(global::Type::interaction(&q, &r), a2_2, global::Type::end());
+        let p1 = global::Type::interaction(&p, &q);
+        let p1_1 = global::Type::add_message(p1, a, p2_1);
+        let p1_2 = global::Type::add_message(p1_1, b, p2_2);
+
+        let local_r = super::project(&p1_2, &r);
+        // This should return None because merge is not possible.
+        match local_r {
+            Some(_) => assert!(false),
+            None    => (),
         }
     }
 }

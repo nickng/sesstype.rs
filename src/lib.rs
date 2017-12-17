@@ -593,6 +593,20 @@ pub mod local {
             m_selbr_type
         }
 
+        /// Returns the number of branches/selects
+        /// for the Type::Branch/Type::Select.
+        ///
+        /// Returns 1 for other Type variants (1 continuation).
+        ///
+        pub fn len(&self) -> usize {
+            match *self {
+                Type::Branch { ref s, .. } => s.len(),
+                Type::Select { ref s, .. } => s.len(),
+                _ => 1,
+            }
+
+        }
+
         /// Returns a heap-allocated `Type::Recur`.
         ///
         /// `name` is the name given to the recursion scope.
