@@ -153,9 +153,7 @@ impl Message {
         &self.label
     }
 
-    /// Appends a payload type to the `Message` then returns the modified `Message`.
-    ///
-    /// The caller `Message` cannot be used again after adding the payload.
+    /// Creates a `Message` with a base type payload.
     ///
     /// # Example
     ///
@@ -171,6 +169,24 @@ impl Message {
             payload: PayloadType::BaseType(String::from(payload)),
         }
     }
+
+    /// Creates a `Message` with a session type payload.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sesstype::Message;
+    /// use sesstype::local;
+    ///
+    /// let _msg = Message::with_payload_session("label", local::Type::end()); // label(end)
+    /// ```
+    ///
+    pub fn with_payload_session(label: &str, payload: Box<local::Type>) -> Message {
+        Message {
+            label: String::from(label),
+            payload: PayloadType::Session(payload),
+        }
+    }
 }
 
 impl Clone for Message {
@@ -180,9 +196,9 @@ impl Clone for Message {
                 label: self.label.clone(),
                 payload: PayloadType::BaseType(t.clone()),
             },
-            PayloadType::Session(_) => Message {
+            PayloadType::Session(ref s) => Message {
                 label: self.label.clone(),
-                payload: PayloadType::Empty, // TODO
+                payload: PayloadType::Session(s.clone()),
             },
             PayloadType::Empty => Message {
                 label: self.label.clone(),
@@ -199,9 +215,9 @@ impl ToString for Message {
     ///
     fn to_string(&self) -> String {
         let payload = match self.payload {
-            PayloadType::BaseType(ref t) => t.as_str(),
-            PayloadType::Session(_) => "", // TODO
-            PayloadType::Empty => "",
+            PayloadType::BaseType(ref t) => String::from(t.as_str().clone()),
+            PayloadType::Session(ref s) => String::from(s.to_string().clone()),
+            PayloadType::Empty => String::from(""),
         };
 
         format!(
@@ -711,6 +727,7 @@ mod tests {
     use super::global;
     use super::local;
     use super::Message;
+    use super::PayloadType;
     use super::Role;
 
     #[test]
@@ -825,5 +842,60 @@ mod tests {
             }
             _ => assert!(false),
         }
+    }
+
+    #[test]
+    fn example_session_passing() {
+        let sndr = Role::new("alice");
+        let rcvr = Role::new("bob");
+
+        let p = global::Type::interaction(&sndr, &rcvr);
+        let l = Message::with_payload_session("label", local::Type::recur("T", local::Type::add_message(local::Type::branch(&Role::new("a")), Message::with_payload_type("L", "T"), local::Type::end())));
+        let p2 = global::Type::add_message(p, l, global::Type::end());
+
+        match *p2 {
+            global::Type::Interact { ref p, ref q, ref g } => {
+                assert_eq!(p.name(), sndr.name());
+                assert_eq!(q.name(), rcvr.name());
+                for (m_i, g_i) in g {
+                    assert!(*m_i.label() == String::from("label"));
+                    match m_i.payload {
+                        PayloadType::Session(ref s) => {
+                            match **s {
+                                local::Type::Recur { ref t, ref s } => {
+                                    assert!(*t == String::from("T"));
+                                    match **s {
+                                        local::Type::Branch { ref p, ref s } => {
+                                            assert_eq!(*p.name(), String::from("a"));
+                                            for (m_i, s_i) in s {
+                                                assert!(*m_i.label() == String::from("L"));
+                                                match m_i.payload {
+                                                    PayloadType::BaseType(ref t) => assert!(*t == String::from("T")),
+                                                    _ => assert!(false),
+                                                }
+                                                match **s_i {
+                                                    local::Type::End => (),
+                                                    _ => assert!(false),
+                                                }
+                                            }
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                },
+                                _ => assert!(false)
+                            }
+                        },
+                        _ => assert!(false),
+                    }
+                    match **g_i {
+                        global::Type::End => (),
+                        _ => assert!(false),
+                    }
+                }
+            },
+            _ => assert!(false),
+        }
+
+        assert_eq!(p2.to_string(), "alice → bob:label(μT.a?L(T).end).end");
     }
 }
