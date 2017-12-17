@@ -257,11 +257,10 @@ named_args!(sendrecv<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message
 );
 
 named_args!(sendrecvs<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<global::Type>)>>,
-       ws!(do_parse!(
-               tag!("{") >>
-               e: separated_list!(tag!(","), call!(sendrecv, r, tv)) >>
-               tag!("}") >>
-               (e)
+       ws!(delimited!(
+               tag!("{"),
+               separated_list!(tag!(","), call!(sendrecv, r, tv)),
+               tag!("}")
        ))
 );
 
@@ -336,11 +335,10 @@ named_args!(recv<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message, Bo
 );
 
 named_args!(recvs<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<local::Type>)>>,
-       ws!(do_parse!(
-               tag!("{") >>
-               e: separated_list!(tag!(","), call!(recv, r, tv)) >>
-               tag!("}") >>
-               (e)
+       ws!(delimited!(
+               tag!("{"),
+               separated_list!(tag!(","), call!(recv, r, tv)),
+               tag!("}")
        ))
 );
 
@@ -374,11 +372,10 @@ named_args!(send<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message, Bo
 );
 
 named_args!(sends<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<local::Type>)>>,
-       ws!(do_parse!(
-               tag!("{") >>
-               e: separated_list!(tag!(","), call!(send, r, tv)) >>
-               tag!("}") >>
-               (e)
+       ws!(delimited!(
+               tag!("{"),
+               separated_list!(tag!(","), call!(send, r, tv)),
+               tag!("}")
        ))
 );
 
