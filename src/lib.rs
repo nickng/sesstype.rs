@@ -96,6 +96,7 @@ pub use projection::project;
 /// - base type: `String` symbol that maps to a data type (e.g. `"bool"`, `"int"`)
 /// - closed local type: local session type used for session delegation
 ///
+#[derive(Debug)]
 pub enum PayloadType {
     BaseType(String), // String symbol that maps to a base type
     Session(Box<local::Type>), // Closed local type
@@ -111,6 +112,7 @@ pub enum PayloadType {
 ///
 /// `Message` should never be shared.
 ///
+#[derive(Debug)]
 pub struct Message {
     label: String, // label of the message, can be empty
     payload: PayloadType, // (optional) payload types string
@@ -234,6 +236,7 @@ impl Hash for Message {
 /// Typical usage of a `Role` is to create once in a session, and reuse
 /// the same `Role` variable in the session.
 ///
+#[derive(Debug)]
 pub struct Role {
     name: String,
 }
@@ -294,6 +297,7 @@ pub mod global {
     /// >     | t
     /// >     | end
     ///
+    #[derive(Debug)]
     pub enum Type {
         /// Interaction Type between two `Role`s.
         ///
@@ -464,6 +468,7 @@ pub mod local {
     /// >     | t
     /// >     | end
     ///
+    #[derive(Debug)]
     pub enum Type {
         /// Branching Type receives a `Message` chosen by a `Role`.
         ///
