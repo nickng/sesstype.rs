@@ -190,26 +190,23 @@ named_args!(role<'a>(r: &'a mut RoleRegistry)<Rc<Role>>,
 named!(message<Message>,
        do_parse!(
            label: call!(ident) >>
-           pt: call!(payload) >>
-           (match pt {
-               PayloadType::BaseType(s) => Message::with_payload_type(&*label, &*s),
-               PayloadType::Session(_)  => Message::new(&*label),
-               PayloadType::Empty       => Message::new(&*label),
+           payload: call!(payload) >>
+           (Message {
+               label: String::from(label),
+               payload: payload,
            })
        )
 );
 
-// payload = '()' | '(' ident ')'
+// payload = '()' | '(' ident ')' | '(' local ')'
 named!(payload<PayloadType>,
-       do_parse!(
-           tag!("(") >>
-           t: call!(ident) >>
-           tag!(")") >>
-           (if t == "" {
-               PayloadType::Empty
-           } else {
-               PayloadType::BaseType(t)}
-           )
+       delimited!(
+           tag!("("),
+           alt_complete!(
+               call!(local, &mut RoleRegistry::new(), &mut TypeVars::new()) => {|s| PayloadType::Session(s)} |
+               call!(ident)                                                 => {|t| if t == "" {PayloadType::Empty} else {PayloadType::BaseType(t)}}
+           ),
+           tag!(")")
        )
 );
 
