@@ -103,6 +103,17 @@ pub enum PayloadType {
     Empty,
 }
 
+impl PartialEq for PayloadType {
+    fn eq(&self, other: &PayloadType) -> bool {
+        match (self, other) {
+            (&PayloadType::Empty,            &PayloadType::Empty)            => true,
+            (&PayloadType::BaseType(ref t1), &PayloadType::BaseType(ref t2)) => *t1 == *t2,
+            (&PayloadType::Session(ref s1),  &PayloadType::Session(ref s2))  => s1 == s2,
+            _ => false,
+        }
+    }
+}
+
 /// A structure to represent a message passed between `Role`s.
 ///
 /// A `Message` consists of a label, and optionally, a `PayloadType`
@@ -230,8 +241,8 @@ impl ToString for Message {
 
 impl PartialEq for Message {
     fn eq(&self, other: &Message) -> bool {
-
-        self.label == other.label // TODO: payload type comparison.
+        self.label == other.label &&
+            self.payload == other.payload
     }
 }
 
@@ -629,9 +640,62 @@ pub mod local {
 
         /// Returns a heap-allocated `Type::End`.
         ///
-        /// All types should end in an instance of this.
+        /// All types should end in an instance of this (or TypeVar).
+        ///
         pub fn end() -> Box<Type> {
             Box::new(Type::End)
+        }
+
+        /// Deep-compares two local types.
+        ///
+        /// This compare considers two types the same if the role names
+        /// (references) are identical, and Type is structurally equivalent.
+        ///
+        pub fn deep_eq(&self, other: &Type) -> bool {
+            match (self, other) {
+                (&Type::Branch { p: ref p1, s: ref s1 }, &Type::Branch { p: ref p2, s: ref s2 })
+                    => { let mut equal = Rc::ptr_eq(p1, p2);
+                         if s1.len() == s2.len() {
+                            for (m_i, s_i) in s1 {
+                                let mut found = false;
+                                for (m2_i, s2_i) in s2 {
+                                    if m_i.label() == m2_i.label() && m_i.payload == m2_i.payload {
+                                        found = true;
+                                        equal = equal && s_i == s2_i;
+                                    }
+                                }
+                                equal = equal && found;
+                            }
+                         } else {
+                             equal = false
+                         }
+                         equal
+                       },
+                (&Type::Select { p: ref p1, s: ref s1 }, &Type::Select { p: ref p2, s: ref s2 })
+                    => { let mut equal = Rc::ptr_eq(p1, p2);
+                         if s1.len() == s2.len() {
+                            for (m_i, s_i) in s1 {
+                                let mut found = false;
+                                for (m2_i, s2_i) in s2 {
+                                    if m_i.label() == m2_i.label() && m_i.payload == m2_i.payload {
+                                        found = true;
+                                        equal = equal && s_i == s2_i;
+                                    }
+                                }
+                                equal = equal && found;
+                            }
+                         } else {
+                             equal = false
+                         }
+                         equal
+                       },
+                (&Type::Recur { t: ref t1, s: ref s1 }, &Type::Recur { t: ref t2, s: ref s2 })
+                    => *t1 == *t2 && &*s1 == &*s2,
+                (&Type::TypeVar { t: ref t1 }, &Type::TypeVar { t: ref t2 })
+                    => *t1 == *t2,
+                (&Type::End, &Type::End) => true,
+                _ => false
+            }
         }
     }
 
@@ -730,6 +794,62 @@ pub mod local {
                 Type::Recur { ref t, ref s } => format!("μ{}.{}", t, s.to_string()),
                 Type::TypeVar { ref t } => format!("{}", t),
                 Type::End => String::from("end"),
+            }
+        }
+    }
+
+    impl PartialEq for Type {
+        /// Returns true if two local::Type are structurally equivalent.
+        ///
+        /// Roles are considered the same if their String name are equal,
+        /// as this is the more common use of equality in this library.
+        /// For equality where Roles are identical references, use the
+        /// deep_eq() method.
+        ///
+        fn eq(&self, other: &Type) -> bool {
+            match (self, other) {
+                (&Type::Branch { p: ref p1, s: ref s1 }, &Type::Branch { p: ref p2, s: ref s2 })
+                    => { let mut equal = p1.name() == p2.name();
+                         if s1.len() == s2.len() {
+                            for (m_i, s_i) in s1 {
+                                let mut found = false;
+                                for (m2_i, s2_i) in s2 {
+                                    if m_i.label() == m2_i.label() && m_i.payload == m2_i.payload {
+                                        found = true;
+                                        equal = equal && s_i == s2_i;
+                                    }
+                                }
+                                equal = equal && found;
+                            }
+                         } else {
+                             equal = false
+                         }
+                         equal
+                       },
+                (&Type::Select { p: ref p1, s: ref s1 }, &Type::Select { p: ref p2, s: ref s2 })
+                    => { let mut equal = p1.name() == p2.name();
+                         if s1.len() == s2.len() {
+                            for (m_i, s_i) in s1 {
+                                let mut found = false;
+                                for (m2_i, s2_i) in s2 {
+                                    if m_i.label() == m2_i.label() && m_i.payload == m2_i.payload {
+                                        found = true;
+                                        equal = equal && s_i == s2_i;
+                                    }
+                                }
+                                equal = equal && found;
+                            }
+                         } else {
+                             equal = false
+                         }
+                         equal
+                       },
+                (&Type::Recur { t: ref t1, s: ref s1 }, &Type::Recur { t: ref t2, s: ref s2 })
+                    => *t1 == *t2 && &*s1 == &*s2,
+                (&Type::TypeVar { t: ref t1 }, &Type::TypeVar { t: ref t2 })
+                    => *t1 == *t2,
+                (&Type::End, &Type::End) => true,
+                _ => false
             }
         }
     }

@@ -518,4 +518,30 @@ mod tests {
             None => assert!(false),
         }
     }
+
+    #[test]
+    fn test_equality() {
+        //
+        // Test that the two processes are equal despite the ordering.
+        //
+        let l1 = parse_local_type(String::from("A&{ ?l1(int).end, ?l2( *T.B!().*T.T ).end}"));
+        let (l1_type, _l1_reg) = l1.unwrap();
+        let l2 = parse_local_type(String::from("A&{ ?l2(*T.B!().*T.T).end, ?l1(int).end}"));
+        let (l2_type, _l2_reg) = l2.unwrap();
+
+        assert_eq!(l1_type, l2_type);
+    }
+
+    #[test]
+    fn test_deep_equality() {
+        //
+        // Test that the two processes are equal despite the ordering.
+        //
+        let l1 = parse_local_type(String::from("A&{ ?l1(int).end, ?l2( *T.B!().*T.T ).end}"));
+        let (l1_type, _l1_reg) = l1.unwrap();
+        let l2 = parse_local_type(String::from("A&{ ?l2(*T.B!().*T.T).end, ?l1(int).end}"));
+        let (l2_type, _l2_reg) = l2.unwrap();
+
+        assert!(!l1_type.deep_eq(&l2_type));
+    }
 }
