@@ -64,14 +64,14 @@ extern crate nom;
 /// ## Local Types
 ///
 /// ```ignore
-/// local    = role "&" branch
-///          | role "+" select
+/// local    = role branch
+///          | role select
 ///          | lrecur
 ///          | ltypevar
 ///          | end
-/// branch   = recv | "{" recv ("," recv)+ "}"
+/// branch   = recv | "&{" recv ("," recv)+ "}"
 /// recv     = "?" message "." local
-/// select   = send | "{" send ("," send)+ "}"
+/// select   = send | "+{" send ("," send)+ "}"
 /// send     = "!" message "." local
 /// lrecur   = "*" ident "." local
 /// ltypevar = ident

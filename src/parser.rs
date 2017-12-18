@@ -287,8 +287,8 @@ named!(end<Box<global::Type>>,
        map!(tag!("end"), |_| global::Type::end())
 );
 
-// local    = role '&' branch
-//          | role '+' select
+// local    = role branch
+//          | role select
 //          | lrecur
 //          | ltypevar
 //          | end
@@ -302,11 +302,10 @@ named_args!(local<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<local::
        ))
 );
 
-// branch   = recv | '{' recv (',' recv)+ '}'
+// branch   = recv | '&{' recv (',' recv)+ '}'
 named_args!(branch<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<local::Type>>,
        ws!(do_parse!(
                p: call!(role, r) >>
-               tag!("&") >>
                s: alt!(
                    call!(recv, r, tv)  => {|t: _| singleton_vec(t)} |
                    call!(recvs, r, tv) => {|v: _| v}) >>
@@ -332,18 +331,21 @@ named_args!(recv<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message, Bo
 );
 
 named_args!(recvs<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<local::Type>)>>,
-       ws!(delimited!(
-               tag!("{"),
-               separated_list!(tag!(","), call!(recv, r, tv)),
-               tag!("}")
+       ws!(do_parse!(
+               tag!("&") >>
+               recvs: delimited!(
+                   tag!("{"),
+                   separated_list!(tag!(","), call!(recv, r, tv)),
+                   tag!("}")
+               ) >>
+               (recvs)
        ))
 );
 
-// select   = send | '{' send (',' send)+ '}'
+// select   = send | '+{' send (',' send)+ '}'
 named_args!(select<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Box<local::Type>>,
        ws!(do_parse!(
                p: call!(role, r) >>
-               alt!( tag!("+") | tag!("⊕") ) >>
                s: alt!(
                    call!(send, r, tv)  => {|t: _| singleton_vec(t)} |
                    call!(sends, r, tv) => {|v: _| v}) >>
@@ -369,11 +371,15 @@ named_args!(send<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<(Message, Bo
 );
 
 named_args!(sends<'a>(r: &'a mut RoleRegistry, tv: &'a mut TypeVars)<Vec<(Message, Box<local::Type>)>>,
-       ws!(delimited!(
-               tag!("{"),
-               separated_list!(tag!(","), call!(send, r, tv)),
-               tag!("}")
-       ))
+       ws!(do_parse!(
+               alt!( tag!("+") | tag!("⊕") ) >>
+               sends: delimited!(
+                   tag!("{"),
+                   separated_list!(tag!(","), call!(send, r, tv)),
+                   tag!("}")
+               ) >>
+               (sends)
+           ))
 );
 
 // lrecur   = '*' ident '.' local
