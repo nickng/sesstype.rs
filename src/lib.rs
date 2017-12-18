@@ -720,7 +720,6 @@ pub mod local {
                 Type::TypeVar { ref t } => Type::typevar(&t),
                 Type::End => Type::end(),
             }
-
         }
     }
 
